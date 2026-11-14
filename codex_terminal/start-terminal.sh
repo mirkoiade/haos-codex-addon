@@ -46,8 +46,7 @@ Choose what you want to do:
   2) Resume the most recent Codex session
   3) Choose a previous Codex session
   4) Open a normal shell
-  5) Start Codex with web search and no sandbox/approval prompts
-  6) Exit
+  5) Exit
 
 Helpful shell commands:
   codex-menu
@@ -64,7 +63,7 @@ run_menu() {
   while true; do
     show_menu
     echo
-    read -r -p "Selection [1-6]: " choice
+    read -r -p "Selection [1-5]: " choice
     echo
 
     case "${choice}" in
@@ -86,17 +85,11 @@ run_menu() {
         run_shell
         ;;
       5)
-        run_codex \
-          "Starting Codex with web search and without sandbox/approval prompts..." \
-          env NETWORK_ACCESS=true codex --search --dangerously-bypass-approvals-and-sandbox
-        pause_for_menu
-        ;;
-      6)
         echo "Closing Codex Terminal."
         exit 0
         ;;
       *)
-        echo "Invalid selection. Please choose a number from 1 to 6."
+        echo "Invalid selection. Please choose a number from 1 to 5."
         pause_for_menu
         ;;
     esac
