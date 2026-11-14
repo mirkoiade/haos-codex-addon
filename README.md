@@ -1,3 +1,7 @@
+> **FORK PERSONALE – ANTEPRIMA IN SOLA LETTURA:** questo repository è una variante sperimentale per Home Assistant Green. Leggi [SAFE_PREVIEW.md](SAFE_PREVIEW.md) prima di installare. I paragrafi seguenti descrivono la versione originale upstream e potrebbero non corrispondere ai permessi limitati del fork.
+
+---
+
 # Codex Terminal for Home Assistant OS
 
 `Codex Terminal` is a Home Assistant add-on that gives you a terminal directly inside the Home Assistant interface and includes the OpenAI Codex CLI.
