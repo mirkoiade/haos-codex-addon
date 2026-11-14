@@ -47,9 +47,9 @@ export TERM=xterm-256color
 export CODEX_START_DIR="${WORKDIR}"
 export CODEX_STARTUP_MODE="${STARTUP_MODE}"
 
-alias codex-new='cd "${CODEX_START_DIR}" && codex'
-alias codex-resume='cd "${CODEX_START_DIR}" && codex resume'
-alias codex-last='cd "${CODEX_START_DIR}" && codex resume --last'
+alias codex-new='cd "${CODEX_START_DIR}" && codex --sandbox read-only --ask-for-approval on-request'
+alias codex-resume='cd "${CODEX_START_DIR}" && codex --sandbox read-only --ask-for-approval on-request resume'
+alias codex-last='cd "${CODEX_START_DIR}" && codex --sandbox read-only --ask-for-approval on-request resume --last'
 alias codex-menu='/start-terminal.sh "${CODEX_START_DIR}" "${SHELL}" menu'
 alias codex_new='cd "${CODEX_START_DIR}" && codex'
 alias codex_resume='cd "${CODEX_START_DIR}" && codex resume'

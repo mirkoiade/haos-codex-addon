@@ -1,0 +1,49 @@
+name: Safe Preview - validate and ARM64 build
+on:
+  push:
+    branches: [safe-preview-readonly-20261114]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Bash syntax
+        run: |
+          bash -n codex_terminal/run.sh
+          bash -n codex_terminal/start-terminal.sh
+      - name: Verify restricted app manifest
+        run: |
+          python3 -m pip install --user PyYAML
+          python3 - <<'PY'
+          from pathlib import Path
+          import yaml
+          c = yaml.safe_load(Path('codex_terminal/config.yaml').read_text())
+          assert c['map'] == [{'type':'homeassistant_config', 'read_only':True, 'path':'/workspace'}]
+          assert c['boot'] == 'manual'
+          assert c['stage'] == 'experimental'
+          assert c['panel_admin'] is True
+          assert 'aarch64' in c['arch']
+          assert c['ingress'] is True
+          menu = Path('codex_terminal/start-terminal.sh').read_text()
+          assert '--dangerously-bypass-approvals-and-sandbox' not in menu
+          assert '--sandbox read-only --ask-for-approval on-request' in menu
+          assert Path('codex_terminal/Dockerfile').read_text().startswith('FROM ghcr.io/home-assistant/base:3.24')
+          print('Manifest, safety flags and Dockerfile: PASS')
+          PY
+
+  arm64-build:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build ARM64 image (no publish or deploy)
+        run: docker buildx build --platform linux/arm64 --progress=plain -f codex_terminal/Dockerfile codex_terminal
