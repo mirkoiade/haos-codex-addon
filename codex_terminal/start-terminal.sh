@@ -68,15 +68,15 @@ run_menu() {
 
     case "${choice}" in
       1)
-        run_codex "Starting a new Codex session..." codex
+        run_codex "Starting a read-only Codex session..." codex --sandbox read-only --ask-for-approval on-request
         pause_for_menu
         ;;
       2)
-        run_codex "Resuming the most recent Codex session..." codex resume --last
+        run_codex "Resuming the last Codex session (read-only)..." codex --sandbox read-only --ask-for-approval on-request resume --last
         pause_for_menu
         ;;
       3)
-        run_codex "Opening the Codex session picker..." codex resume
+        run_codex "Opening the Codex session picker (read-only)..." codex --sandbox read-only --ask-for-approval on-request resume
         pause_for_menu
         ;;
       4)
