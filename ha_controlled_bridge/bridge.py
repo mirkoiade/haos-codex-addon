@@ -21,6 +21,7 @@ from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from starlette.routing import Route
 
 from policy import energy_eligibility, replace_energy_source, validate_entity_id, ws_command
+from transactions import ApprovalError, apply_enable_entity, apply_energy_source_replace, approve_plan
 
 OPTIONS = json.loads(Path("/data/options.json").read_text())
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
@@ -220,61 +221,13 @@ async def _registry_entry(entity_id: str) -> dict[str, Any] | None:
 
 async def _apply(plan: dict[str, Any], confirm_flow: bool) -> None:
     if plan["kind"] == "enable_entity":
-        current = await _registry_entry(plan["entity_id"])
-        if not current or current.get("disabled_by") != plan["before"]:
-            raise RuntimeError("Registry changed since preview; create a new plan")
-        try:
-            await ha.call("config/entity_registry/update", {
-                "entity_id": plan["entity_id"], "disabled_by": None,
-            })
-            result = await _registry_entry(plan["entity_id"])
-            if not result or result.get("disabled_by") is not None:
-                raise RuntimeError("Entity registry readback did not match")
-        except Exception as original:
-            try:
-                await ha.call("config/entity_registry/update", {
-                    "entity_id": plan["entity_id"], "disabled_by": plan["before"],
-                })
-                restored = await _registry_entry(plan["entity_id"])
-                if not restored or restored.get("disabled_by") != plan["before"]:
-                    raise RuntimeError("Registry rollback readback did not match")
-            except Exception as rollback_error:
-                plan["status"] = "rollback_failed"
-                raise RuntimeError("Enable failed and registry rollback verification failed") from rollback_error
-            raise original
+        await apply_enable_entity(plan, ha)
     elif plan["kind"] == "replace_energy_source":
         if not confirm_flow:
             raise ValueError("Physical meter-channel meaning was not confirmed")
-        current = await ha.call("energy/get_prefs")
-        if current != plan["before_prefs"]:
-            raise RuntimeError("Energy preferences changed since preview; create a new plan")
-        fresh = await _candidate_report(plan["statistic_id"])
-        if not fresh["eligible"]:
-            raise RuntimeError("Candidate no longer meets energy eligibility checks")
-        after = plan["after_prefs"]
-        payload = {k: after[k] for k in ("energy_sources", "device_consumption", "device_consumption_water")
-                   if k in after}
-        try:
-            await ha.call("energy/save_prefs", payload)
-            actual = await ha.call("energy/get_prefs")
-            if actual != after:
-                raise RuntimeError("Energy preferences readback did not match")
-            validation = await ha.call("energy/validate")
-            if plan["statistic_id"] in json.dumps(validation):
-                raise RuntimeError("Energy validation reports an issue for the candidate")
-        except Exception:
-            before = plan["before_prefs"]
-            restore = {k: before[k] for k in ("energy_sources", "device_consumption", "device_consumption_water")
-                       if k in before}
-            await ha.call("energy/save_prefs", restore)
-            if await ha.call("energy/get_prefs") != before:
-                plan["status"] = "rollback_failed"
-                raise RuntimeError("Apply failed and rollback verification failed")
-            plan["status"] = "rolled_back"
-            raise
+        await apply_energy_source_replace(plan, ha, _candidate_report)
     else:
         raise PermissionError("Unknown staged operation")
-
 
 async def _is_ingress_admin(request: Request) -> bool:
     if not request.client or request.client.host != "172.30.32.2":
@@ -320,23 +273,20 @@ async def _approve(request: Request) -> JSONResponse:
         return JSONResponse({"error": "Invalid approval session"}, status_code=403)
     payload = await request.json()
     plan = PLANS.get(str(payload.get("plan_id", "")))
-    if not plan or plan["status"] != "pending" or plan["expires"] < time.time():
-        return JSONResponse({"error": "Plan is absent, expired or already handled"}, status_code=409)
+    if not plan:
+        return JSONResponse({"error": "Plan not found"}, status_code=409)
     confirm_flow = payload.get("confirm_physical_flow") is True
-    if plan["kind"] == "replace_energy_source" and not confirm_flow:
-        return JSONResponse({"error": "Confirm the physical channel meaning first"}, status_code=400)
-    plan["status"] = "applying"
     try:
-        await _apply(plan, confirm_flow)
-        plan["status"] = "applied"
+        await approve_plan(plan, time.time(), confirm_flow, _apply)
         _audit("plan_applied", {"id": plan["id"], "kind": plan["kind"]})
         return JSONResponse({"status": "applied", "plan_id": plan["id"]})
+    except ApprovalError as err:
+        status_code = 409 if plan.get("status") in {"expired", "rejected", "applied", "failed"} else 400
+        return JSONResponse({"status": plan.get("status"), "error": str(err)}, status_code=status_code)
     except Exception as err:
-        if plan["status"] != "rolled_back":
-            plan["status"] = "failed"
         _audit("plan_failed", {"id": plan["id"], "kind": plan["kind"],
                                "error": type(err).__name__})
-        return JSONResponse({"status": plan["status"], "error": str(err)}, status_code=409)
+        return JSONResponse({"status": plan.get("status"), "error": str(err)}, status_code=409)
 
 
 async def _reject(request: Request) -> JSONResponse:

@@ -10,6 +10,21 @@ permissions:
   contents: read
 
 jobs:
+  arm64-container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build Home Assistant Green (aarch64) image without publishing
+        uses: docker/build-push-action@v6
+        with:
+          context: ha_controlled_bridge
+          file: ha_controlled_bridge/Dockerfile
+          platforms: linux/arm64
+          push: false
+          tags: ha-controlled-mcp-bridge:ci
+
   unit:
     runs-on: ubuntu-latest
     steps:
@@ -50,7 +65,7 @@ jobs:
           )
           assert app is not None
           PY
-      - name: Compile and run policy tests
+      - name: Compile and run bridge tests
         run: |
-          python -m py_compile ha_controlled_bridge/policy.py ha_controlled_bridge/bridge.py
+          python -m py_compile ha_controlled_bridge/policy.py ha_controlled_bridge/transactions.py ha_controlled_bridge/bridge.py
           python -m unittest discover -s ha_controlled_bridge/tests -v

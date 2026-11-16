@@ -78,3 +78,35 @@ def ws_command(command: str, args: dict[str, Any]) -> dict[str, Any]:
     if command not in allowed:
         raise PermissionError("WebSocket command is not allowlisted")
     return {"type": command, **args}
+
+def energy_validation_issue_types(
+    validation: dict[str, Any], source_index: int, statistic_id: str
+) -> list[str]:
+    """Return issue types for this candidate in the selected electrical source.
+
+    Home Assistant energy/validate returns energy_sources as one list of issue
+    lists per source. Each issue's affected_entities contains [entity_id, detail]
+    pairs. Unknown or malformed response shapes fail closed.
+    """
+    if not isinstance(validation, dict):
+        raise ValueError("Malformed energy/validate response")
+    sources = validation.get("energy_sources")
+    if not isinstance(sources, list) or source_index < 0 or source_index >= len(sources):
+        raise ValueError("Malformed energy/validate energy_sources")
+    issues = sources[source_index]
+    if not isinstance(issues, list):
+        raise ValueError("Malformed energy/validate source issues")
+    found: list[str] = []
+    for issue in issues:
+        if not isinstance(issue, dict) or not isinstance(issue.get("type"), str):
+            raise ValueError("Malformed energy/validate issue")
+        affected = issue.get("affected_entities")
+        if not isinstance(affected, list):
+            raise ValueError("Malformed energy/validate affected_entities")
+        for item in affected:
+            if not isinstance(item, (list, tuple)) or len(item) != 2 or not isinstance(item[0], str):
+                raise ValueError("Malformed energy/validate affected entity")
+            if item[0] == statistic_id:
+                found.append(issue["type"])
+                break
+    return found

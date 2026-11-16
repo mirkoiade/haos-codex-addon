@@ -64,7 +64,7 @@ admin-only.
    change only if eligibility succeeds; inspect the complete before/after diff,
    explicitly attest channel meaning, then approve in Ingress.
 5. Verify Energy preferences, validation and statistics. Each plan captures the
-   previous preferences for rollback. No restart is part of this workflow.
+   previous preferences for rollback. Registry rollback is limited by Home Assistant's API: `config/entity_registry/update` accepts `disabled_by: user` or `null`, but cannot restore `disabled_by: integration`. If an enable partially applies and must be compensated, the bridge re-disables as `user` and reports `compensated_user_disabled`; it never claims exact restoration. If that write/readback fails, status is `rollback_failed`. Energy preference rollback is verified with `energy/get_prefs`.
 
 A zero-energy interval can be legitimate. This prototype requires recorder
 samples, not a positive consumption value; physical flow semantics remain a
