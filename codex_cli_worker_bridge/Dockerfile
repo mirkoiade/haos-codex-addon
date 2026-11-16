@@ -1,6 +1,6 @@
 # Separate TEST candidate, no original Worker replacement.
-# Version tag is NOT digest pinned; verify before production.
-FROM ghcr.io/moryoav/codex-cli-worker:0.1.82
+# Immutable ARM64 base digest confirmed by GitHub Actions ARM64 build #43822677755.
+FROM ghcr.io/moryoav/codex-cli-worker@sha256:9c4a4438cc504a54901113b9df34bda89c9fdf4e2f600b6592abae000c303b72
 COPY apply_worker_patch.py controlled_bridge_mcp.py /opt/ha-bridge-patch/
 RUN set -eu; \
     mkdir -p /tmp/ha-bridge-upstream; \

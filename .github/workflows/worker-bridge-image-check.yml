@@ -32,7 +32,9 @@ jobs:
               assert check in s, check
           assert not any(x.strip().startswith('image: ') for x in s.splitlines())
           assert not any(x.strip().startswith('full_access: true') for x in s.splitlines())
-          print('Candidate safety defaults: PASS')
+          dockerfile=Path('codex_cli_worker_bridge/Dockerfile').read_text()
+          assert 'ghcr.io/moryoav/codex-cli-worker@sha256:9c4a4438cc504a54901113b9df34bda89c9fdf4e2f600b6592abae000c303b72' in dockerfile
+          print('Candidate safety defaults and immutable base digest: PASS')
           PY
       - name: Build ARM64 test candidate without publishing
         uses: docker/build-push-action@v6

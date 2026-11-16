@@ -29,5 +29,7 @@ The independent bearer token must be entered in each app's local options;
 NEVER in chat or GitHub. Keep port 8765 unmapped. Test read-only tools first.
 All writes stay behind bridge Ingress approval.
 
-The candidate image derives from upstream image 0.1.82 tagged but not digest
-pinned. Verify immutable base identity before any production use.
+The candidate derives from the exact upstream 0.1.82 ARM64 image digest
+sha256:9c4a4438cc504a54901113b9df34bda89c9fdf4e2f600b6592abae000c303b72. The digest was captured from the successful GitHub Actions
+ARM64 build #43822677755. This is still a TEST candidate, not a deployed
+production configuration.
