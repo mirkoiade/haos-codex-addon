@@ -1,0 +1,49 @@
+name: Worker controlled candidate ARM64 build
+on:
+  push:
+    branches: [codex/haos-controlled-mcp-bridge]
+    paths:
+      - 'codex_cli_worker_bridge/**'
+      - '.github/workflows/worker-bridge-image-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+
+jobs:
+  candidate-arm64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Enforce candidate patch equal to reviewed connector
+        run: |
+          cmp worker_connector/apply_worker_patch.py codex_cli_worker_bridge/apply_worker_patch.py
+          cmp worker_connector/controlled_bridge_mcp.py codex_cli_worker_bridge/controlled_bridge_mcp.py
+      - name: Verify disabled by default and distinct app ID
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('codex_cli_worker_bridge/config.yaml').read_text()
+          for check in ('slug: codex_cli_worker_bridge','boot: manual',
+            'panel_admin: true','apparmor: true','codex_sandbox: read-only',
+            'auto_save_lovelace: false','controlled_bridge_enabled: false',
+            'controlled_bridge_token: password?'):
+              assert check in s, check
+          assert not any(x.strip().startswith('image: ') for x in s.splitlines())
+          assert not any(x.strip().startswith('full_access: true') for x in s.splitlines())
+          print('Candidate safety defaults: PASS')
+          PY
+      - name: Build ARM64 test candidate without publishing
+        uses: docker/build-push-action@v6
+        with:
+          context: codex_cli_worker_bridge
+          file: codex_cli_worker_bridge/Dockerfile
+          platforms: linux/arm64
+          push: false
+          load: true
+          tags: ha-codex-worker-bridge:ci
+      - name: Smoke test packaged ARM64 connector without HA connection
+        run: |
+          docker run --rm --platform linux/arm64 --entrypoint python3 ha-codex-worker-bridge:ci -c "import sys; sys.path.insert(0, '/'); import controlled_bridge_mcp; assert controlled_bridge_mcp.BRIDGE_REPOSITORY_ID == '17dc2992'; print('ARM64 Worker candidate: PASS')"
+          docker run --rm --platform linux/arm64 --entrypoint /usr/local/bin/codex ha-codex-worker-bridge:ci --version
