@@ -1,8 +1,8 @@
 # HA Controlled MCP Bridge (experimental)
 
 This is an additive, manual-start Home Assistant app for testing a narrow MCP
-bridge. It is not installed, built, or published to Home Assistant Green by
-this change. It never mounts `/config`, `.storage`, or secrets files.
+bridge. It has not been installed on Home Assistant Green or published as an add-on.
+Its ARM64 container is built and import-smoke-tested in CI only. It never mounts `/config`, `.storage`, or secrets files.
 
 ## Initial supported operations
 
@@ -83,7 +83,7 @@ tools, never as a caller-supplied command string.
 From the repository root, run `python -m unittest discover -s ha_controlled_bridge/tests -v`. These tests
 cover the pure allowlist and energy-eligibility policy; they do not connect to a
 live Green or prove Supervisor Ingress identity, Core API proxy behavior, ARM64
-runtime compatibility, or Home Assistant version compatibility. CI installs the pinned MCP SDK, validates the app manifest, smoke-tests the MCP transport API, and runs policy tests plus Python compilation. It does not build the ARM64 image or test against a live Green. Before any installation, the user must
+runtime compatibility, or Home Assistant version compatibility. CI installs the pinned MCP SDK, validates the app manifest, smoke-tests the MCP transport API, runs policy tests plus Python compilation, and builds a Linux ARM64 container. A containerized import smoke test checks that the required modules are present in the built image. These checks do not prove Supervisor Ingress identity, the live Core API proxy, or runtime behavior on a real Green. Before any installation, the user must
 review this branch, run the workflow, and explicitly approve installing/configuring
 the app and networking. No token generation/export and no Green API call are part
 of this branch change.
