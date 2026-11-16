@@ -68,7 +68,7 @@ async def apply_enable_entity(plan: dict[str, Any], ha: Any) -> None:
                     raise original
             plan["status"] = "rollback_failed"
             raise RuntimeError("Enable failed; prior integration-disabled status cannot be restored through the supported API") from original
-        except RuntimeError as rollback_error:
+        except Exception as rollback_error:
             if plan.get("status") in {"failed_unchanged", "compensated_user_disabled"}:
                 raise original
             if plan.get("status") != "rollback_failed":
