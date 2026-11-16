@@ -23,7 +23,15 @@ jobs:
           file: ha_controlled_bridge/Dockerfile
           platforms: linux/arm64
           push: false
+          load: true
           tags: ha-controlled-mcp-bridge:ci
+      - name: Verify packaged ARM64 runtime imports
+        run: |
+          docker run --rm --platform linux/arm64 --entrypoint sh ha-controlled-mcp-bridge:ci -ec '
+            mkdir -p /data
+            printf "%s\n" "{\"mcp_access_token\":\"\",\"mcp_allowed_hosts\":[],\"energy_candidate_entity_ids\":[]}" > /data/options.json
+            python3 -c "import policy, transactions, bridge; print(\"Packaged ARM64 bridge imports: PASS\")"
+          '
 
   unit:
     runs-on: ubuntu-latest
