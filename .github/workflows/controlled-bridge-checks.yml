@@ -2,8 +2,13 @@ name: Controlled bridge tests
 on:
   push:
     branches: [codex/haos-controlled-mcp-bridge]
+    paths:
+      - 'ha_controlled_bridge/**'
   pull_request:
     branches: [main]
+    paths:
+      - 'ha_controlled_bridge/**'
+      - '.github/workflows/controlled-bridge-checks.yml'
   workflow_dispatch:
 
 permissions:

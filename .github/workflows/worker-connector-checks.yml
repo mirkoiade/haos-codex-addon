@@ -1,0 +1,54 @@
+name: Worker bridge connector check
+on:
+  push:
+    branches: [codex/haos-controlled-mcp-bridge]
+    paths:
+      - 'worker_connector/**'
+      - '.github/workflows/worker-connector-checks.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+
+jobs:
+  pinned-worker-patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout user branch
+        uses: actions/checkout@v4
+      - name: Checkout exact upstream Worker 0.1.82
+        uses: actions/checkout@v4
+        with:
+          repository: moryoav/home-assistant-codex
+          ref: ce05342ec6e9b8b18df8c7884f5cad4eb72f60a3
+          path: upstream
+          persist-credentials: false
+      - name: Apply narrow patch; fail if upstream changes
+        run: python3 worker_connector/apply_worker_patch.py upstream
+      - name: Compile patched Worker and connector
+        run: |
+          python3 -m py_compile upstream/codex-cli-worker/server.py upstream/codex-cli-worker/controlled_bridge_mcp.py
+      - name: Run only NEW connector tests
+        run: python3 -m unittest discover -s worker_connector/tests -v
+      - name: Check Worker source and manifest invariants
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, 'upstream/codex-cli-worker')
+          from controlled_bridge_mcp import bridge_mcp_args, bridge_mcp_env
+          root = Path('upstream/codex-cli-worker')
+          source = (root/'server.py').read_text()
+          manifest = (root/'config.yaml').read_text()
+          dockerfile = (root/'Dockerfile').read_text()
+          assert '*verification_mcp_args(), *data_mcp_args(), *bridge_mcp_args(read_options())' in source
+          assert '**bridge_mcp_env(options)' in source
+          assert 'approval_policy="on-request"' in source
+          assert '"workspace-write": {"type": "workspaceWrite", "networkAccess": False' in source
+          assert 'controlled_bridge_enabled: false' in manifest
+          assert 'controlled_bridge_token: password?' in manifest
+          assert 'image: ghcr.io/moryoav' not in manifest
+          assert 'COPY server.py controlled_bridge_mcp.py /' in dockerfile
+          assert not bridge_mcp_args({})
+          assert not bridge_mcp_env({})
+          print('Worker connector security and disabled-by-default invariants: PASS')
+          PY
