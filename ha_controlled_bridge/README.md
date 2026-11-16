@@ -51,6 +51,20 @@ separately approved VPN or authenticated reverse proxy is required; do not expos
 the port directly to the public internet. The approval UI is on Ingress and
 admin-only.
 
+## Codex CLI Worker integration prerequisite
+
+The currently deployed upstream Codex CLI Worker 0.1.82 from
+`moryoav/home-assistant-codex` regenerates
+`/data/codex-home/config.toml` when initializing and registers only its two
+built-in MCP servers (`home_assistant` and `home_assistant_data`) in
+`build_app_server_args()`. It has no add-on option for an extra remote MCP URL
+and its token. Therefore installing this bridge alone will **not** expose its
+tools to that Worker. Before attempting deployment, implement and review a
+separate, narrowly scoped Worker-side connector (or another proven supported
+MCP registration path), using protected credentials, appropriate network
+access and no Supervisor-token forwarding. Do not rely on manually editing
+the generated config.toml.
+
 ## Shelly/Energy procedure
 
 1. Set candidate IDs to the two current Shelly Pro EM50 entities, set the MCP
