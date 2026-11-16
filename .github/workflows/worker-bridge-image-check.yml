@@ -20,6 +20,30 @@ jobs:
         run: |
           cmp worker_connector/apply_worker_patch.py codex_cli_worker_bridge/apply_worker_patch.py
           cmp worker_connector/controlled_bridge_mcp.py codex_cli_worker_bridge/controlled_bridge_mcp.py
+      - name: Verify custom AppArmor profile matches pinned upstream
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          from tempfile import TemporaryDirectory
+          from urllib.request import urlopen
+          actual = Path('codex_cli_worker_bridge/apparmor.txt').read_text()
+          expected = urlopen('https://raw.githubusercontent.com/moryoav/home-assistant-codex/ce05342ec6e9b8b18df8c7884f5cad4eb72f60a3/codex-cli-worker/apparmor.txt').read().decode()
+          expected = expected.replace('profile codex_cli_worker flags=', 'profile codex_cli_worker_bridge flags=', 1)
+          assert actual == expected, 'AppArmor profile drift from pinned upstream'
+          assert '  /opt/codex-sandbox/bwrap.real cx,' in actual
+          assert '  profile /opt/codex-sandbox/bwrap.real flags=' in actual
+          assert '    capability sys_admin,' in actual
+          assert '    mount,' in actual
+          assert 'flags=(attach_disconnected,mediate_deleted)' in actual
+          assert 'unconfined' not in actual and 'complain' not in actual
+          print('Versioned upstream AppArmor profile present with isolated bwrap child: PASS')
+          PY
+      - name: Validate AppArmor syntax without loading kernel policy
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq apparmor
+          sudo apparmor_parser --skip-kernel-load --skip-read-cache --skip-write-cache codex_cli_worker_bridge/apparmor.txt
       - name: Verify disabled by default and distinct app ID
         run: |
           python3 - <<'PY'
