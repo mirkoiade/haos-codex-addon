@@ -6,9 +6,14 @@ written to the Codex config file. This module never opens a network connection.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 
-BRIDGE_URL = "http://e37e54d0-ha-controlled-bridge:8765/mcp"
+# Home Assistant includes the exact #branch suffix in the repo-id hash.
+# This is deliberately a fixed trusted URL, not an arbitrary user endpoint.
+BRIDGE_REPOSITORY_URL = "https://github.com/mirkoiade/haos-codex-addon#codex/haos-controlled-mcp-bridge"
+BRIDGE_REPOSITORY_ID = hashlib.sha1(BRIDGE_REPOSITORY_URL.lower().encode("utf-8")).hexdigest()[:8]
+BRIDGE_URL = f"http://{BRIDGE_REPOSITORY_ID}-ha-controlled-bridge:8765/mcp"
 TOKEN_ENV = "HA_CONTROLLED_BRIDGE_MCP_TOKEN"
 ALLOWED_TOOLS = [
     "inspect_shelly_energy_entities",

@@ -1,5 +1,6 @@
 """New connector tests only; original bridge tests are not repeated."""
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import unittest
@@ -36,7 +37,8 @@ class ControlledBridgeConnectorTests(unittest.TestCase):
         opts = {"controlled_bridge_enabled": True, "controlled_bridge_token": token}
         args = bridge.bridge_mcp_args(opts)
         settings = settings_from_args(args)
-        self.assertEqual(settings["url"], "http://e37e54d0-ha-controlled-bridge:8765/mcp")
+        self.assertEqual(settings["url"], "http://17dc2992-ha-controlled-bridge:8765/mcp")
+        self.assertEqual(bridge.BRIDGE_REPOSITORY_ID, hashlib.sha1(bridge.BRIDGE_REPOSITORY_URL.lower().encode()).hexdigest()[:8])
         self.assertEqual(settings["bearer_token_env_var"], bridge.TOKEN_ENV)
         self.assertEqual(settings["enabled_tools"], bridge.ALLOWED_TOOLS)
         self.assertEqual(settings["default_tools_approval_mode"], "approve")

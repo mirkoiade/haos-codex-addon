@@ -29,6 +29,36 @@ jobs:
           python3 -m py_compile upstream/codex-cli-worker/server.py upstream/codex-cli-worker/controlled_bridge_mcp.py
       - name: Run only NEW connector tests
         run: python3 -m unittest discover -s worker_connector/tests -v
+      - name: Install pinned Codex CLI parser for config validation
+        run: |
+          npm install --prefix "$RUNNER_TEMP/codex-compat" --no-audit --no-fund --no-save @openai/codex@0.165.0
+      - name: Validate remote MCP args with actual Codex 0.165.0
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+          sys.path.insert(0, 'worker_connector')
+          from controlled_bridge_mcp import bridge_mcp_args, bridge_mcp_env
+          opts = {'controlled_bridge_enabled': True,
+                  'controlled_bridge_token': 'ci-fake-token-do-not-use-in-production-12345678'}
+          args = bridge_mcp_args(opts)
+          exe = Path(os.environ['RUNNER_TEMP']) / 'codex-compat' / 'node_modules' / '.bin' / 'codex'
+          proc = subprocess.run([str(exe), *args, 'mcp', 'list', '--json'],
+                                env={**os.environ, **bridge_mcp_env(opts)},
+                                text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+          if proc.returncode:
+              raise RuntimeError('Pinned CLI rejected MCP config: ' + proc.stderr[-1500:])
+          parsed = json.loads(proc.stdout)
+          target = next((entry for entry in parsed if entry.get('name') == 'ha_controlled_bridge'), None)
+          if target is None:
+              raise RuntimeError('Pinned CLI did not register the expected MCP server')
+          assert target.get('transport', {}).get('url') == 'http://17dc2992-ha-controlled-bridge:8765/mcp', target
+          assert 'ci-fake-token-do-not-use-in-production' not in proc.stdout
+          print('Codex 0.165.0 external MCP configuration parsed and registered: PASS')
+          PY
       - name: Check Worker source and manifest invariants
         run: |
           python3 - <<'PY'
