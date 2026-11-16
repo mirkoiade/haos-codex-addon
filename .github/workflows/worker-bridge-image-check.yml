@@ -43,7 +43,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq apparmor
-          sudo apparmor_parser --skip-kernel-load --skip-read-cache --skip-write-cache codex_cli_worker_bridge/apparmor.txt
+          sudo apparmor_parser --skip-kernel-load --skip-read-cache codex_cli_worker_bridge/apparmor.txt
       - name: Verify disabled by default and distinct app ID
         run: |
           python3 - <<'PY'
