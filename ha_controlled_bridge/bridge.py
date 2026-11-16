@@ -25,6 +25,8 @@ from policy import energy_eligibility, replace_energy_source, validate_entity_id
 OPTIONS = json.loads(Path("/data/options.json").read_text())
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 MCP_TOKEN = OPTIONS.get("mcp_access_token", "")
+if MCP_TOKEN and len(MCP_TOKEN) < 32:
+    raise RuntimeError("MCP access key must be at least 32 characters")
 ENTITY_ALLOWLIST = set(OPTIONS.get("energy_candidate_entity_ids", []))
 PLANS: dict[str, dict[str, Any]] = {}
 PLAN_TTL = 900
@@ -94,12 +96,40 @@ async def _candidate_report(entity_id: str) -> dict[str, Any]:
     meta = _metadata_by_id(metadata, entity_id)
     series = samples.get(entity_id, []) if isinstance(samples, dict) else []
     eligible, reasons = energy_eligibility(state, meta, series)
+    raw_value = (state or {}).get("state")
+    try:
+        safe_value = str(float(raw_value))
+    except (TypeError, ValueError):
+        safe_value = raw_value if raw_value in {"unknown", "unavailable"} else "[non-numeric state redacted]"
+    attrs = (state or {}).get("attributes") or {}
+    safe_state = None if state is None else {
+        "entity_id": entity_id,
+        "state": safe_value,
+        "last_changed": state.get("last_changed"),
+        "last_updated": state.get("last_updated"),
+        "attributes": {key: attrs[key] for key in (
+            "device_class", "state_class", "unit_of_measurement", "restored"
+        ) if key in attrs},
+    }
+    safe_registry = None if reg_entry is None else {
+        key: reg_entry[key] for key in ("entity_id", "platform", "device_id", "disabled_by")
+        if key in reg_entry
+    }
+    safe_device = None if device is None else {
+        key: device[key] for key in ("id", "manufacturer", "model")
+        if key in device
+    }
+    safe_meta = None if meta is None else {
+        key: meta[key] for key in (
+            "statistic_id", "has_sum", "has_mean", "unit_class", "unit_of_measurement"
+        ) if key in meta
+    }
     return {
         "entity_id": entity_id,
-        "state": state,
-        "entity_registry": reg_entry,
-        "device": device,
-        "statistics_metadata": meta,
+        "state": safe_state,
+        "entity_registry": safe_registry,
+        "device": safe_device,
+        "statistics_metadata": safe_meta,
         "sample_count": len(series),
         "eligible": eligible,
         "reasons": reasons,

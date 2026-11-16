@@ -37,7 +37,7 @@ def energy_eligibility(
     else:
         if metadata.get("has_sum") is not True:
             reasons.append("recorder statistic does not support sum")
-        if metadata.get("unit_class") not in (None, "energy"):
+        if metadata.get("unit_class") != "energy":
             reasons.append("recorder unit_class is not energy")
     if not samples:
         reasons.append("no recorder samples are available in the checked period")

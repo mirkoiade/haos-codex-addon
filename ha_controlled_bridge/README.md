@@ -70,6 +70,14 @@ A zero-energy interval can be legitimate. This prototype requires recorder
 samples, not a positive consumption value; physical flow semantics remain a
 human confirmation because entity metadata cannot establish wiring direction.
 
+## Explicitly out of scope for this prototype
+
+Dashboard creation/editing and arbitrary YAML/configuration writes are not
+implemented. They need separate, narrow adapters, their own preview/approval
+format, and a documented rollback path; this prototype intentionally exposes no
+generic file or WebSocket command. Add future operations as typed allowlisted
+tools, never as a caller-supplied command string.
+
 ## Tests and limitations
 
 Run `python -m unittest discover -s tests -v` in this directory. These tests

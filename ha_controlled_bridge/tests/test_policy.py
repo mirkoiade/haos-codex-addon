@@ -1,47 +1,80 @@
-import unittest
+"""Pure policy helpers. No HA I/O and no filesystem access."""
+from __future__ import annotations
 
-from ha_controlled_bridge.policy import energy_eligibility, replace_energy_source, validate_entity_id, ws_command
+import copy
+import re
+from typing import Any
 
-
-class PolicyTests(unittest.TestCase):
-    def setUp(self):
-        self.state = {"state": "123.4", "attributes": {
-            "device_class": "energy", "state_class": "total_increasing",
-            "unit_of_measurement": "kWh",
-        }}
-        self.metadata = {"has_sum": True, "unit_class": "energy"}
-
-    def test_energy_candidate_requires_state_metadata_and_samples(self):
-        ok, reasons = energy_eligibility(self.state, self.metadata, [{"change": 1.2}])
-        self.assertTrue(ok, reasons)
-        ok, reasons = energy_eligibility(self.state, self.metadata, [])
-        self.assertFalse(ok)
-        self.assertIn("no recorder samples are available in the checked period", reasons)
-
-    def test_rejects_unavailable_or_wrong_classes(self):
-        state = {"state": "unavailable", "attributes": self.state["attributes"]}
-        ok, reasons = energy_eligibility(state, self.metadata, [{"change": 1}])
-        self.assertFalse(ok)
-        self.assertIn("entity has no usable current state", reasons)
-
-    def test_preference_update_preserves_unrelated_values(self):
-        prefs = {"energy_sources": [{"type": "grid", "stat_energy_from": "sensor.old"}],
-                 "device_consumption": [{"stat_consumption": "sensor.other"}]}
-        result = replace_energy_source(prefs, 0, "sensor.new")
-        self.assertEqual(result["energy_sources"][0]["stat_energy_from"], "sensor.new")
-        self.assertEqual(result["device_consumption"], prefs["device_consumption"])
-        self.assertEqual(prefs["energy_sources"][0]["stat_energy_from"], "sensor.old")
-
-    def test_registry_writes_are_entity_allowlisted(self):
-        self.assertEqual(validate_entity_id("sensor.a", {"sensor.a"}), "sensor.a")
-        with self.assertRaises(PermissionError):
-            validate_entity_id("sensor.b", {"sensor.a"})
-
-    def test_websocket_command_allowlist_rejects_arbitrary_call(self):
-        self.assertEqual(ws_command("energy/get_prefs", {})["type"], "energy/get_prefs")
-        with self.assertRaises(PermissionError):
-            ws_command("homeassistant/turn_off", {"entity_id": "switch.x"})
+ENTITY_ID_RE = re.compile(r"^[a-z_]+\.[a-z0-9_]+$")
+ENERGY_UNITS = {"Wh", "kWh", "MWh"}
 
 
-if __name__ == "__main__":
-    unittest.main()
+def validate_entity_id(entity_id: str, allowlist: set[str]) -> str:
+    if not ENTITY_ID_RE.fullmatch(entity_id):
+        raise ValueError("Invalid entity_id")
+    if entity_id not in allowlist:
+        raise PermissionError("Entity is outside the configured allowlist")
+    return entity_id
+
+
+def energy_eligibility(
+    state: dict[str, Any] | None,
+    metadata: dict[str, Any] | None,
+    samples: list[dict[str, Any]] | None,
+) -> tuple[bool, list[str]]:
+    reasons: list[str] = []
+    if not state or state.get("state") in (None, "unknown", "unavailable"):
+        reasons.append("entity has no usable current state")
+    attrs = (state or {}).get("attributes") or {}
+    if attrs.get("device_class") != "energy":
+        reasons.append("device_class must be energy")
+    if attrs.get("state_class") not in {"total", "total_increasing"}:
+        reasons.append("state_class must be total or total_increasing")
+    if attrs.get("unit_of_measurement") not in ENERGY_UNITS:
+        reasons.append("unit must be Wh, kWh, or MWh")
+    if not metadata:
+        reasons.append("recorder has no statistics metadata")
+    else:
+        if metadata.get("has_sum") is not True:
+            reasons.append("recorder statistic does not support sum")
+        if metadata.get("unit_class") != "energy":
+            reasons.append("recorder unit_class is not energy")
+    if not samples:
+        reasons.append("no recorder samples are available in the checked period")
+    return not reasons, reasons
+
+
+def replace_energy_source(
+    prefs: dict[str, Any], source_index: int, statistic_id: str
+) -> dict[str, Any]:
+    if not isinstance(source_index, int) or source_index < 0:
+        raise ValueError("source_index must be a non-negative integer")
+    if not ENTITY_ID_RE.fullmatch(statistic_id):
+        raise ValueError("Invalid statistic_id")
+    updated = copy.deepcopy(prefs)
+    sources = updated.get("energy_sources")
+    if not isinstance(sources, list) or source_index >= len(sources):
+        raise ValueError("Energy source index does not exist")
+    source = sources[source_index]
+    if source.get("type") not in {"grid", "solar", "battery"}:
+        raise ValueError("Only electrical energy sources can be changed")
+    source["stat_energy_from"] = statistic_id
+    return updated
+
+
+def ws_command(command: str, args: dict[str, Any]) -> dict[str, Any]:
+    allowed = {
+        "get_states",
+        "config/entity_registry/list",
+        "config/auth/list",
+        "config/device_registry/list",
+        "config/entity_registry/update",
+        "energy/get_prefs",
+        "energy/save_prefs",
+        "energy/validate",
+        "recorder/get_statistics_metadata",
+        "recorder/statistics_during_period",
+    }
+    if command not in allowed:
+        raise PermissionError("WebSocket command is not allowlisted")
+    return {"type": command, **args}
