@@ -36,6 +36,20 @@ jobs:
           assert not c.get('map')
           print('Manifest and safety defaults: PASS')
           PY
+      - name: Smoke-test the MCP SDK transport API
+        run: |
+          python - <<'PY'
+          from mcp.server import MCPServer
+          from mcp.server.transport_security import TransportSecuritySettings
+          server = MCPServer('smoke-test')
+          app = server.streamable_http_app(
+              transport_security=TransportSecuritySettings(
+                  allowed_hosts=['127.0.0.1:8765'],
+                  allowed_origins=[],
+              )
+          )
+          assert app is not None
+          PY
       - name: Compile and run policy tests
         run: |
           python -m py_compile ha_controlled_bridge/policy.py ha_controlled_bridge/bridge.py

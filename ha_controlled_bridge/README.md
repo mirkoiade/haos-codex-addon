@@ -80,11 +80,10 @@ tools, never as a caller-supplied command string.
 
 ## Tests and limitations
 
-Run `python -m unittest discover -s tests -v` in this directory. These tests
+From the repository root, run `python -m unittest discover -s ha_controlled_bridge/tests -v`. These tests
 cover the pure allowlist and energy-eligibility policy; they do not connect to a
 live Green or prove Supervisor Ingress identity, Core API proxy behavior, ARM64
-runtime compatibility, or Home Assistant version compatibility. CI performs
-policy tests and Python compilation only. Before any installation, the user must
+runtime compatibility, or Home Assistant version compatibility. CI installs the pinned MCP SDK, validates the app manifest, smoke-tests the MCP transport API, and runs policy tests plus Python compilation. It does not build the ARM64 image or test against a live Green. Before any installation, the user must
 review this branch, run the workflow, and explicitly approve installing/configuring
 the app and networking. No token generation/export and no Green API call are part
 of this branch change.
